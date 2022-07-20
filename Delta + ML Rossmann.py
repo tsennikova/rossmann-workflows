@@ -44,7 +44,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Cross Notebook Reference
-# MAGIC %run ./setup
+# MAGIC %run ./resources/setup
 
 # COMMAND ----------
 
@@ -61,13 +61,22 @@ display(spark.read.format("parquet").schema("Store long, DayOfWeek long, Date ti
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC USE CATALOG field_demos
+print("We using catalog "+ catalog)
 
 # COMMAND ----------
 
-#%sql
-#CREATE SCHEMA field_demos.rossmann_lineage
+# MAGIC %sql
+# MAGIC USE CATALOG `${c.catalog}`
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC CREATE DATABASE IF NOT EXISTS `${da.db_name}`
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC USE `${da.db_name}`
 
 # COMMAND ----------
 
@@ -85,7 +94,7 @@ bronzeDF.writeStream \
         .trigger(processingTime='1 seconds') \
         .option("mergeSchema", "true")\
         .format("delta") \
-        .table("field_demos.rossmann_lineage.br_rossmann_transactions")
+        .table("br_rossmann_transactions")
 
 # COMMAND ----------
 
@@ -96,7 +105,7 @@ display(statesDF)
 # COMMAND ----------
 
 write_format = "delta"
-table_name = "field_demos.rossmann_lineage.br_rossmann_states"
+table_name = "br_rossmann_states"
 
 # Write the data to its target.
 statesDF.write \
@@ -107,15 +116,15 @@ statesDF.write \
 
 # DBTITLE 1,Merge Batch and Stream
 # MAGIC %sql
-# MAGIC CREATE TABLE field_demos.rossmann_lineage.br_rossmann_transactions_and_states 
+# MAGIC CREATE TABLE br_rossmann_transactions_and_states 
 # MAGIC AS SELECT * EXCEPT(a.Store)
-# MAGIC   FROM field_demos.rossmann_lineage.br_rossmann_transactions a 
-# MAGIC     LEFT JOIN field_demos.rossmann_lineage.br_rossmann_states b ON a.Store=b.Store;
+# MAGIC   FROM br_rossmann_transactions a 
+# MAGIC     LEFT JOIN br_rossmann_states b ON a.Store=b.Store;
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SELECT * FROM field_demos.rossmann_lineage.br_rossmann_transactions_and_states 
+# MAGIC SELECT * FROM br_rossmann_transactions_and_states 
 
 # COMMAND ----------
 
@@ -130,7 +139,7 @@ display(storeDF)
 
 # COMMAND ----------
 
-table_name = "field_demos.rossmann_lineage.br_rossmann_stores"
+table_name = "br_rossmann_stores"
 
 # Write the data to its target.
 storeDF.write \
@@ -141,20 +150,15 @@ storeDF.write \
 
 # DBTITLE 1,Enrich Transaction Data with Information about Stores
 # MAGIC %sql
-# MAGIC CREATE TABLE field_demos.rossmann_lineage.br_rossmann_transactions_enriched
+# MAGIC CREATE TABLE br_rossmann_transactions_enriched
 # MAGIC AS SELECT * EXCEPT(a.Store)
-# MAGIC   FROM field_demos.rossmann_lineage.br_rossmann_transactions_and_states  a 
-# MAGIC     LEFT JOIN field_demos.rossmann_lineage.br_rossmann_stores b ON a.Store=b.Store;
+# MAGIC   FROM br_rossmann_transactions_and_states  a 
+# MAGIC     LEFT JOIN br_rossmann_stores b ON a.Store=b.Store;
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SELECT * FROM field_demos.rossmann_lineage.br_rossmann_transactions_enriched
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC SELECT * FROM field_demos.rossmann_lineage.br_rossmann_transactions_enriched where
+# MAGIC SELECT * FROM br_rossmann_transactions_enriched
 
 # COMMAND ----------
 
@@ -164,20 +168,24 @@ storeDF.write \
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC CREATE TABLE field_demos.rossmann_lineage.sl_rossmann_transactions
+# MAGIC CREATE TABLE sl_rossmann_transactions
 # MAGIC AS SELECT * 
-# MAGIC   FROM field_demos.rossmann_lineage.br_rossmann_transactions_enriched
+# MAGIC   FROM br_rossmann_transactions_enriched
 
 # COMMAND ----------
 
-# DBTITLE 1,Data Analysis with Koalas
+# DBTITLE 1,Data Analysis with pyspark.pandas
 import pyspark.pandas as pd
-silver_df = pd.read_table("field_demos.rossmann_lineage.sl_rossmann_transactions")
+silver_df = pd.read_table("sl_rossmann_transactions")
 
 # COMMAND ----------
 
 # DBTITLE 1,Check for the NULL values
 silver_df.isnull().sum()
+
+# COMMAND ----------
+
+silver_df.groupby("StoreType")["Sales"].median().plot.bar()
 
 # COMMAND ----------
 
@@ -194,7 +202,7 @@ silver_df.isnull().sum()
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC DELETE FROM field_demos.rossmann_lineage.sl_rossmann_transactions WHERE CompetitionOpenSinceMonth is null or CompetitionOpenSinceMonth is null
+# MAGIC DELETE FROM sl_rossmann_transactions WHERE CompetitionOpenSinceMonth is null or CompetitionOpenSinceMonth is null
 
 # COMMAND ----------
 
@@ -205,27 +213,27 @@ silver_df.isnull().sum()
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC UPDATE field_demos.rossmann_lineage.sl_rossmann_transactions SET Promo2SinceWeek = 0 WHERE Promo2SinceWeek is null
+# MAGIC UPDATE sl_rossmann_transactions SET Promo2SinceWeek = 0 WHERE Promo2SinceWeek is null
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC ALTER TABLE field_demos.rossmann_lineage.sl_rossmann_transactions ADD COLUMNS (SalesPerCustomer double);
+# MAGIC ALTER TABLE sl_rossmann_transactions ADD COLUMNS (SalesPerCustomer double);
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SELECT * FROM field_demos.rossmann_lineage.sl_rossmann_transactions
+# MAGIC SELECT * FROM sl_rossmann_transactions
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC UPDATE field_demos.rossmann_lineage.sl_rossmann_transactions SET SalesPerCustomer = Sales / Customers;
+# MAGIC UPDATE sl_rossmann_transactions SET SalesPerCustomer = Sales / Customers;
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SELECT * FROM field_demos.rossmann_lineage.sl_rossmann_transactions
+# MAGIC SELECT * FROM sl_rossmann_transactions
 
 # COMMAND ----------
 
@@ -254,7 +262,7 @@ silver_df.isnull().sum()
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC DESCRIBE HISTORY field_demos.rossmann_lineage.sl_rossmann_transactions
+# MAGIC DESCRIBE HISTORY sl_rossmann_transactions
 
 # COMMAND ----------
 
@@ -264,7 +272,7 @@ silver_df.isnull().sum()
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC select sum(case when CompetitionOpenSinceMonth is null then 1 else 0 end) as CompetitionOpenSinceMonth_NULL from field_demos.rossmann_lineage.sl_rossmann_transactions VERSION AS OF 0
+# MAGIC select sum(case when CompetitionOpenSinceMonth is null then 1 else 0 end) as CompetitionOpenSinceMonth_NULL from sl_rossmann_transactions VERSION AS OF 0
 
 # COMMAND ----------
 
@@ -284,7 +292,7 @@ spark.sql("SET spark.databricks.delta.retentionDurationCheck.enabled=false")
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC VACUUM field_demos.rossmann_lineage.sl_rossmann_transactions RETAIN 0.01 HOURS
+# MAGIC VACUUM sl_rossmann_transactions RETAIN 0.01 HOURS
 
 # COMMAND ----------
 
@@ -307,7 +315,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # COMMAND ----------
 
-mlDF = spark.table("field_demos.rossmann_lineage.sl_rossmann_transactions") 
+mlDF = spark.table("sl_rossmann_transactions") 
 
 # COMMAND ----------
 
@@ -382,15 +390,15 @@ display(goldDF.loc[goldDF['Store'] < 50])
 
 # COMMAND ----------
 
-spark.createDataFrame(goldDF[["Store", "prediction", "Real_Sales"]]).write.format("delta").mode("overwrite").saveAsTable("field_demos.rossmann_lineage.rossmann_ml_scoring")
+spark.createDataFrame(goldDF[["Store", "prediction", "Real_Sales"]]).write.format("delta").mode("overwrite").saveAsTable("rossmann_ml_scoring")
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC CREATE TABLE field_demos.rossmann_lineage.gl_rossmann_transactions 
+# MAGIC CREATE TABLE gl_rossmann_transactions 
 # MAGIC AS SELECT * EXCEPT(a.Store)
-# MAGIC   FROM field_demos.rossmann_lineage.sl_rossmann_transactions a 
-# MAGIC     LEFT JOIN field_demos.rossmann_lineage.rossmann_ml_scoring b ON a.Store=b.Store;
+# MAGIC   FROM sl_rossmann_transactions a 
+# MAGIC     LEFT JOIN rossmann_ml_scoring b ON a.Store=b.Store;
 
 # COMMAND ----------
 
@@ -403,6 +411,16 @@ spark.createDataFrame(goldDF[["Store", "prediction", "Real_Sales"]]).write.forma
 
 # MAGIC %md
 # MAGIC <img src = "https://github.com/tsennikova/databricks-demo/blob/main/Rossmann%20Sales.png?raw=true" width="1000">
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Clean up
+# MAGIC Run the following cell to remove the database that we created in this demo.
+
+# COMMAND ----------
+
+#DA.cleanup()
 
 # COMMAND ----------
 

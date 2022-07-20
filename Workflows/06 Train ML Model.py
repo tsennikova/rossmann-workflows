@@ -1,6 +1,18 @@
 # Databricks notebook source
+catalog = dbutils.jobs.taskValues.get(taskKey="Setup", key="catalog")
+db_name = dbutils.jobs.taskValues.get(taskKey="Setup", key="db_name")
+spark.sql(f"SET c.catalog = {catalog}")
+spark.sql(f"SET da.db_name = {db_name}")
+
+# COMMAND ----------
+
 # MAGIC %sql
-# MAGIC USE CATALOG field_demos
+# MAGIC USE CATALOG `${c.catalog}`
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC USE `${da.db_name}`
 
 # COMMAND ----------
 
@@ -15,7 +27,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # COMMAND ----------
 
-mlDF = spark.table("field_demos.rossmann_workflows.sl_rossmann_transactions"
+mlDF = spark.table("field_demos.rossmann_workflows.sl_rossmann_transactions")
 
 # COMMAND ----------
 
@@ -34,24 +46,20 @@ test = xgb.DMatrix(data=test_x, label=test_y)
 
 def train_model(params):
   with mlflow.start_run(nested=True) as run:
-   
     booster = xgb.train(params=params, dtrain=train, num_boost_round=1000,\
                         evals=[(test, "test")], early_stopping_rounds=10, verbose_eval=100)   
     predictions_test = booster.predict(test)
-    
+
     mae = mean_absolute_error(test_y, predictions_test)
     mse = mean_squared_error(test_y, predictions_test)
     r2 = r2_score (test_y, predictions_test)
-    
-    mlflow.log_metric('mae', mae)
-    mlflow.log_metric('mse', mse)
-    mlflow.log_metric('r2', r2)
-    
+
     model_uri = f"runs:/{run.info.run_uuid}/model" # model identifier representing this run!
-    return { "model_uri":model_uri, 'loss': -1*r2, 'booster': booster.attributes()}
+  return { "model_uri":model_uri, 'loss': -1*r2, 'booster': booster.attributes()}
 
 # COMMAND ----------
 
+mlflow.set_experiment("/Users/tatiana.sennikova@databricks.com/rossmann_workflows")
 mlflow.xgboost.autolog()
 result = train_model(
   {
@@ -65,3 +73,27 @@ result = train_model(
 )
 r2 = -1*result['loss']
 r2
+
+# COMMAND ----------
+
+def predict_python(model_uri, data):  
+  model = mlflow.pyfunc.load_model(model_uri)
+  predictions = model.predict(data)
+  df = pd.DataFrame(predictions.astype(int),columns=["prediction"])
+  return df
+preds_df = predict_python(result["model_uri"],test_x)
+# Combining dataframes to compare
+frames = [test_x.reset_index(drop=True), preds_df.reset_index(drop=True), pd.Series(test_y).rename("Real_Sales")]
+goldDF = pd.concat(frames, axis=1)
+
+# COMMAND ----------
+
+spark.createDataFrame(goldDF[["Store", "prediction", "Real_Sales"]]).write.format("delta").mode("overwrite").saveAsTable("rossmann_ml_scoring")
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC CREATE TABLE gl_rossmann_transactions 
+# MAGIC AS SELECT * EXCEPT(a.Store)
+# MAGIC   FROM sl_rossmann_transactions a 
+# MAGIC     LEFT JOIN rossmann_ml_scoring b ON a.Store=b.Store;
