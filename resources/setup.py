@@ -52,6 +52,6 @@ current_user_no_at = re.sub(r'\W+', '_', current_user_no_at)
 
 checkpoint_path = f"/Users/{current_user}/rossmann_lineage_checkpoint"
 
-#dbutils.fs.rm(mount_name+"/retail/_checkpoint", True)
+
 spark.conf.set("spark.databricks.cloudFiles.schemaInference.enabled", "true")
 spark.conf.set("spark.sql.streaming.checkpointLocation", checkpoint_path)

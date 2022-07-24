@@ -27,7 +27,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 # COMMAND ----------
 
-mlDF = spark.table("field_demos.rossmann_workflows.sl_rossmann_transactions")
+mlDF = spark.table("sl_rossmann_transactions")
 
 # COMMAND ----------
 
@@ -89,6 +89,10 @@ goldDF = pd.concat(frames, axis=1)
 # COMMAND ----------
 
 spark.createDataFrame(goldDF[["Store", "prediction", "Real_Sales"]]).write.format("delta").mode("overwrite").saveAsTable("rossmann_ml_scoring")
+
+# COMMAND ----------
+
+spark.sql(f"DROP TABLE IF EXISTS gl_rossmann_transactions")
 
 # COMMAND ----------
 

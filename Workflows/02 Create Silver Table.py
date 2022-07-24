@@ -16,6 +16,12 @@ spark.sql(f"SET da.db_name = {db_name}")
 
 # COMMAND ----------
 
+spark.sql(f"DROP TABLE IF EXISTS br_rossmann_transactions_and_states")
+spark.sql(f"DROP TABLE IF EXISTS br_rossmann_transactions_enriched")
+spark.sql(f"DROP TABLE IF EXISTS sl_rossmann_transactions")
+
+# COMMAND ----------
+
 # MAGIC %sql
 # MAGIC CREATE TABLE br_rossmann_transactions_and_states 
 # MAGIC AS SELECT * EXCEPT(a.Store)

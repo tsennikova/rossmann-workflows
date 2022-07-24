@@ -1,8 +1,8 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC #Rossmann Stores Sales Prediction
-# MAGIC <p>In this example, we demonstrate how to forecast sales using store, promotion, and competitor data. </p>
-# MAGIC <img src = "https://github.com/tsennikova/databricks-demo/blob/main/Rossmann%20Sales.png?raw=true" width="1000">
+# MAGIC <p>In this example, we demonstrate how to forecast sales using store transactions, marketing and competitor's data. </p>
+# MAGIC <img src = "https://github.com/tsennikova/databricks-demo/blob/main/Workflows_Lineage.png?raw=true" width="1000">
 # MAGIC 
 # MAGIC 
 # MAGIC **Usecase**:
@@ -11,16 +11,15 @@
 # MAGIC 
 # MAGIC **Demo Objective**:
 # MAGIC 
-# MAGIC * Show change data capture from streaming source
 # MAGIC * Show unified batch and streaming
 # MAGIC * Show data management with Delta (deletes, updates, schema evolution, time trevel)
-# MAGIC * Show cluster management capability
+# MAGIC * Show lineage
+# MAGIC * Show Exploratory Data Analysis with pyspark.pandas
 # MAGIC * Show how to track ML model parameters, metrics, tags and artifacts
 # MAGIC * Show Databricks platform seamless collaboration capability
 # MAGIC * Demonstrate the simplicity of managing multiple model runs
-# MAGIC * Show model deployment and serving via Rest API and batch
-# MAGIC * Show model versioning and state transition from Staging to Production
 # MAGIC * Show building dashboards in SQL Analytics
+# MAGIC * Show orchestration with Workflows
 # MAGIC 
 # MAGIC **Content:**
 # MAGIC 
@@ -33,9 +32,6 @@
 # MAGIC * store.csv - supplemental information about the stores
 # MAGIC * store_states.csv - mapping of German States
 # MAGIC 
-# MAGIC We will use Gradient Boosted Tree Regression to predict Sales
-# MAGIC 
-# MAGIC Once the model is trained, we'll use MFLow to track its performance and save it in the registry to deploy it in production
 # MAGIC 
 # MAGIC Data Source Acknowledgement: This Data Source Provided By Kaggle
 # MAGIC 
@@ -104,6 +100,7 @@ display(statesDF)
 
 # COMMAND ----------
 
+# DBTITLE 1,Create Delta Table
 write_format = "delta"
 table_name = "br_rossmann_states"
 
@@ -214,6 +211,12 @@ silver_df.groupby("StoreType")["Sales"].median().plot.bar()
 
 # MAGIC %sql
 # MAGIC UPDATE sl_rossmann_transactions SET Promo2SinceWeek = 0 WHERE Promo2SinceWeek is null
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Create a new column
+# MAGIC Let's `ALTER TABLE` by creating `SalesPerCustomer` Column
 
 # COMMAND ----------
 
@@ -410,7 +413,7 @@ spark.createDataFrame(goldDF[["Store", "prediction", "Real_Sales"]]).write.forma
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC <img src = "https://github.com/tsennikova/databricks-demo/blob/main/Rossmann%20Sales.png?raw=true" width="1000">
+# MAGIC <img src = "https://github.com/tsennikova/databricks-demo/blob/main/Workflows_Lineage.png?raw=true" width="1000">
 
 # COMMAND ----------
 

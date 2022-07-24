@@ -11,10 +11,6 @@ spark.sql(f"SET da.db_name = {db_name}")
 
 # COMMAND ----------
 
-
-
-# COMMAND ----------
-
 # MAGIC %sql
 # MAGIC CREATE DATABASE IF NOT EXISTS `${da.db_name}`;
 
@@ -22,6 +18,11 @@ spark.sql(f"SET da.db_name = {db_name}")
 
 # MAGIC %sql
 # MAGIC USE `${da.db_name}`;
+
+# COMMAND ----------
+
+#dbutils.fs.rm(mount_name+"/retail/_checkpoint", True)
+
 
 # COMMAND ----------
 
@@ -34,6 +35,7 @@ bronzeDF = spark.read \
 write_format = "delta"
 table_name = "br_rossmann_transactions"
 
+spark.sql(f"DROP TABLE IF EXISTS {table_name}")
 # Write the data to its target.
 bronzeDF.write \
         .format(write_format) \
@@ -45,6 +47,7 @@ statesDF = spark.read.csv('/mnt/tania/rossmann_demo/store_states_ll.csv', header
 
 table_name = "br_rossmann_states"
 
+spark.sql(f"DROP TABLE IF EXISTS {table_name}")
 # Write the data to its target.
 statesDF.write \
   .format(write_format) \
@@ -58,6 +61,7 @@ storeDF = spark.read.csv('/mnt/tania/rossmann_demo/store.csv',
 
 table_name = "br_rossmann_stores"
 
+spark.sql(f"DROP TABLE IF EXISTS {table_name}")
 # Write the data to its target.
 storeDF.write \
   .format(write_format) \
